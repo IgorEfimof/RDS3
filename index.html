@@ -139,7 +139,7 @@
             background: var(--keyboard-bg);
             color: var(--text-color);
         }
-        #inputTextarea {
+        #inputDisplay {
             width: 100%;
             min-height: 70px;
             border: 1px solid var(--border-color);
@@ -149,7 +149,7 @@
             font-size: 15px;
             background: var(--card-bg);
             color: var(--text-color);
-            resize: none;
+            word-wrap: break-word;
         }
         .input-active {
             border-color: var(--primary-color);
@@ -387,6 +387,14 @@
                 padding-bottom: env(safe-area-inset-bottom);
             }
         }
+        
+        /* Отключение системной клавиатуры */
+        #fakeInput {
+            position: absolute;
+            opacity: 0;
+            height: 0;
+            width: 0;
+        }
     </style>
 </head>
 <body>
@@ -417,7 +425,8 @@
         <div class="card">
             <h2>Добавить тираж</h2>
             <div id="inputContainer" style="position:relative;">
-                <textarea id="inputTextarea" placeholder="Формат: номер_тиража|1,2,3,4,5,6,7,8|1"></textarea>
+                <input type="text" id="fakeInput" readonly />
+                <div id="inputDisplay" onclick="showKeyboard()">Коснитесь для ввода (формат: номер_тиража|1,2,3,4,5,6,7,8|1)</div>
                 <div id="validationError" class="validation-error"></div>
             </div>
             <button id="addHistoryBtn">Добавить</button>
@@ -558,68 +567,68 @@
     }
 
     // --- Ввод ---
-    const inputTextarea = document.getElementById('inputTextarea');
+    const inputDisplay = document.getElementById('inputDisplay');
     const customKeyboard = document.getElementById('customKeyboard');
     const validationError = document.getElementById('validationError');
+    const fakeInput = document.getElementById('fakeInput');
+    
+    // Текущее значение ввода
+    let inputValue = '';
 
     function showKeyboard() {
         customKeyboard.style.display = 'flex';
-        inputTextarea.classList.add('input-active');
+        inputDisplay.classList.add('input-active');
         validationError.style.display = 'none';
+        
+        // Установим фокус на скрытое поле для iOS
+        fakeInput.focus();
     }
+    
     function hideKeyboard() {
         customKeyboard.style.display = 'none';
-        inputTextarea.classList.remove('input-active');
+        inputDisplay.classList.remove('input-active');
+        
+        // Уберем фокус со скрытого поля
+        fakeInput.blur();
+    }
+    
+    function updateInputDisplay() {
+        inputDisplay.textContent = inputValue || 'Коснитесь для ввода (формат: номер_тиража|1,2,3,4,5,6,7,8|1)';
     }
 
-    // Клавиши виртуальной клавиатуры
-    customKeyboard.addEventListener('click', e => {
-        if(!e.target.classList.contains('keyboard-key')) return;
-        const key = e.target.textContent;
-        if(key === 'Готово') {
-            hideKeyboard();
-            return;
-        }
-        if(key === '⌫') {
-            inputTextarea.value = inputTextarea.value.slice(0, -1);
-            return;
-        }
-        // Разрешаем цифры, запятую и вертикальную черту
-        if(/[0-9,|]/.test(key)) {
-            inputTextarea.value += key;
-        }
-    });
-
-    // Обработка touch-событий для виртуальной клавиатуры
-    customKeyboard.addEventListener('touchstart', e => {
-        if(e.target.classList.contains('keyboard-key')) {
-            e.target.classList.add('active');
-        }
-    });
-    
-    customKeyboard.addEventListener('touchend', e => {
-        if(e.target.classList.contains('keyboard-key')) {
-            e.target.classList.remove('active');
-            const key = e.target.textContent;
-            if(key === 'Готово') {
+    // Обработка нажатий на виртуальную клавиатуру
+    document.querySelectorAll('.keyboard-key').forEach(key => {
+        key.addEventListener('click', function() {
+            const keyText = this.textContent;
+            
+            if (keyText === 'Готово') {
                 hideKeyboard();
                 return;
             }
-            if(key === '⌫') {
-                inputTextarea.value = inputTextarea.value.slice(0, -1);
+            
+            if (keyText === '⌫') {
+                inputValue = inputValue.slice(0, -1);
+                updateInputDisplay();
                 return;
             }
-            if(/[0-9,|]/.test(key)) {
-                inputTextarea.value += key;
+            
+            // Разрешаем цифры, запятую и вертикальную черту
+            if(/[0-9,|]/.test(keyText)) {
+                inputValue += keyText;
+                updateInputDisplay();
             }
-        }
+        });
     });
 
-    // Обработчики для textarea
-    inputTextarea.addEventListener('focus', showKeyboard);
-    inputTextarea.addEventListener('blur', () => {
-        // Не скрываем клавиатуру сразу, чтобы дать время нажать на кнопки
-        setTimeout(hideKeyboard, 300);
+    // Для iPad: предотвращаем появление системной клавиатуры
+    inputDisplay.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        showKeyboard();
+    });
+    
+    inputDisplay.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        showKeyboard();
     });
 
     // --- Валидация ввода ---
@@ -664,27 +673,27 @@
 
     // --- Добавление в историю ---
     document.getElementById('addHistoryBtn').onclick = () => {
-        const val = inputTextarea.value.trim();
-        if(!val) {
+        if(!inputValue) {
             validationError.textContent = 'Введите числа в формате: номер_тиража|1,2,3,4,5,6,7,8|1';
             validationError.style.display = 'block';
             return;
         }
         
-        if(!validateInput(val)) return;
+        if(!validateInput(inputValue)) return;
         
         // Проверка дубликатов в истории
-        if(history.includes(val)) {
+        if(history.includes(inputValue)) {
             validationError.textContent = 'Эта комбинация уже есть в истории';
             validationError.style.display = 'block';
             return;
         }
         
-        history.push(val);
+        history.push(inputValue);
         saveHistory();
         renderHistory();
         updateStats();
-        inputTextarea.value = '';
+        inputValue = '';
+        updateInputDisplay();
         hideKeyboard();
     };
 
@@ -764,19 +773,6 @@
     // Переключение методов
     document.querySelectorAll('.method-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentMethod = btn.dataset.method;
-            generateNumbers();
-        });
-        
-        // Добавляем обработчики для touch-устройств
-        btn.addEventListener('touchstart', () => {
-            btn.classList.add('active');
-        });
-        
-        btn.addEventListener('touchend', () => {
-            setTimeout(() => btn.classList.remove('active'), 300);
             document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentMethod = btn.dataset.method;
@@ -1090,6 +1086,9 @@
             setTimeout(() => button.classList.remove('active'), 300);
         });
     });
+    
+    // Инициализация ввода
+    updateInputDisplay();
 </script>
 </body>
 </html>
