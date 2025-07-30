@@ -150,6 +150,8 @@
             background: var(--card-bg);
             color: var(--text-color);
             word-wrap: break-word;
+            -webkit-user-select: none;
+            user-select: none;
         }
         .input-active {
             border-color: var(--primary-color);
@@ -205,6 +207,7 @@
             flex-direction: column;
             gap: 6px;
             touch-action: manipulation;
+            padding-bottom: env(safe-area-inset-bottom);
         }
         .keyboard-row {
             display: flex;
@@ -394,6 +397,8 @@
             opacity: 0;
             height: 0;
             width: 0;
+            top: -1000px;
+            left: -1000px;
         }
     </style>
 </head>
@@ -425,8 +430,8 @@
         <div class="card">
             <h2>Добавить тираж</h2>
             <div id="inputContainer" style="position:relative;">
-                <input type="text" id="fakeInput" readonly />
-                <div id="inputDisplay" onclick="showKeyboard()">Коснитесь для ввода (формат: номер_тиража|1,2,3,4,5,6,7,8|1)</div>
+                <input type="text" id="fakeInput" readonly tabindex="-1" />
+                <div id="inputDisplay" tabindex="0">Коснитесь для ввода (формат: номер_тиража|1,2,3,4,5,6,7,8|1)</div>
                 <div id="validationError" class="validation-error"></div>
             </div>
             <button id="addHistoryBtn">Добавить</button>
@@ -575,21 +580,21 @@
     // Текущее значение ввода
     let inputValue = '';
 
+    // Функция для отображения клавиатуры (PWA-совместимая)
     function showKeyboard() {
         customKeyboard.style.display = 'flex';
         inputDisplay.classList.add('input-active');
         validationError.style.display = 'none';
         
-        // Установим фокус на скрытое поле для iOS
-        fakeInput.focus();
+        // Фокус на скрытое поле для iOS в PWA режиме
+        setTimeout(() => {
+            fakeInput.focus();
+        }, 100);
     }
     
     function hideKeyboard() {
         customKeyboard.style.display = 'none';
         inputDisplay.classList.remove('input-active');
-        
-        // Уберем фокус со скрытого поля
-        fakeInput.blur();
     }
     
     function updateInputDisplay() {
@@ -620,15 +625,26 @@
         });
     });
 
-    // Для iPad: предотвращаем появление системной клавиатуры
+    // Обработчики событий для поля ввода (PWA-совместимые)
+    inputDisplay.addEventListener('click', showKeyboard);
+    
     inputDisplay.addEventListener('touchstart', function(e) {
         e.preventDefault();
         showKeyboard();
     });
     
+    inputDisplay.addEventListener('touchend', function(e) {
+        e.preventDefault();
+    });
+    
     inputDisplay.addEventListener('mousedown', function(e) {
         e.preventDefault();
         showKeyboard();
+    });
+    
+    // Обработка фокуса для PWA
+    fakeInput.addEventListener('focus', function() {
+        // В PWA режиме фокус может быть получен, но нам не нужно ничего делать
     });
 
     // --- Валидация ввода ---
@@ -1089,6 +1105,15 @@
     
     // Инициализация ввода
     updateInputDisplay();
+    
+    // iOS PWA фикс: перефокусировка при возвращении на страницу
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && customKeyboard.style.display === 'flex') {
+            setTimeout(() => {
+                fakeInput.focus();
+            }, 300);
+        }
+    });
 </script>
 </body>
 </html>
