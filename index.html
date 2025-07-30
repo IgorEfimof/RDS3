@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon180.png">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="RDS3">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Рапидо Старт</title>
     <style>
         :root {
@@ -21,6 +19,7 @@
             --history-border: #eee;
             --selected-color: #34c759;
             --special-color: #af52de;
+            --karnaugh-color: #ff9500;
         }
 
         .dark-mode {
@@ -35,6 +34,7 @@
             --history-border: #444;
             --selected-color: #30d158;
             --special-color: #bf5af2;
+            --karnaugh-color: #ff9f0a;
         }
 
         * {
@@ -120,6 +120,9 @@
         }
         .number.special {
             background: var(--special-color);
+        }
+        .number.karnaugh {
+            background: var(--karnaugh-color);
         }
         button {
             width: 100%;
@@ -402,6 +405,23 @@
             top: -1000px;
             left: -1000px;
         }
+        
+        .calc-details {
+            margin-top: 10px;
+            padding: 10px;
+            background: var(--card-bg);
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+        }
+        .calc-details.active {
+            display: block;
+        }
+        .calc-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: var(--primary-color);
+        }
     </style>
 </head>
 <body>
@@ -425,6 +445,12 @@
             <div class="numbers" id="field1"></div>
             <p>Поле 2 (1 из 4):</p>
             <div class="numbers" id="field2"></div>
+            
+            <div id="karnaughCalc" class="calc-details">
+                <div class="calc-title">Расчет метода Карнауха:</div>
+                <div id="karnaughDetails"></div>
+            </div>
+            
             <button id="genBtn">Сгенерировать</button>
             <button id="addPredictionBtn" style="margin-top: 5px; background: var(--selected-color)">Добавить прогноз</button>
         </div>
@@ -787,6 +813,8 @@
     
     // --- Методы генерации ---
     let currentMethod = 'cold';
+    const karnaughDetails = document.getElementById('karnaughDetails');
+    const karnaughCalc = document.getElementById('karnaughCalc');
     
     // Переключение методов
     document.querySelectorAll('.method-btn').forEach(btn => {
@@ -794,6 +822,14 @@
             document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentMethod = btn.dataset.method;
+            
+            // Показываем/скрываем блок с расчетом для Карнауха
+            if (currentMethod === 'karnaugh') {
+                karnaughCalc.classList.add('active');
+            } else {
+                karnaughCalc.classList.remove('active');
+            }
+            
             generateNumbers();
         });
     });
@@ -909,7 +945,7 @@
         }
     }
     
-    // Метод Карнауха (комбинация холодных и горячих чисел)
+    // УЛУЧШЕННЫЙ метод Карнауха с математическими расчетами
     function generateKarnaughNumbers() {
         const countField1 = Array(20).fill(0);
         const countField2 = Array(4).fill(0);
@@ -931,24 +967,44 @@
         });
 
         const draws = history.filter(e => !e.startsWith('прогноз')).length;
-        if(draws < 10) {
+        if(draws < 5) {
             generateColdNumbers();
             return;
         }
         
-        // Сортируем числа по частоте выпадения
+        // 1. Рассчитываем среднюю частоту выпадения
+        const avgFrequency = draws / 20;
+        
+        // 2. Вычисляем отклонение для каждого числа
+        const deviations = countField1.map(count => Math.abs(count - avgFrequency));
+        
+        // 3. Ранжируем числа по степени "устойчивости" (наименьшее отклонение)
         let numbers1 = Array.from({ length: 20 }, (_, i) => i + 1);
-        numbers1.sort((a, b) => countField1[a - 1] - countField1[b - 1]);
+        numbers1.sort((a, b) => deviations[a - 1] - deviations[b - 1]);
         
-        // Выбираем 5 холодных и 3 горячих числа
-        const coldNumbers = numbers1.slice(0, 5);
-        const hotNumbers = numbers1.slice(-3).reverse();
-        const selected1 = [...coldNumbers, ...hotNumbers].sort((a, b) => a - b);
+        // 4. Выбираем 8 самых "устойчивых" чисел
+        const selected1 = numbers1.slice(0, 8).sort((a, b) => a - b);
         
-        // Для второго поля выбираем среднее по частоте
+        // 5. Для второго поля используем медианное значение
         let numbers2 = Array.from({ length: 4 }, (_, i) => i + 1);
         numbers2.sort((a, b) => countField2[a - 1] - countField2[b - 1]);
-        const selected2 = numbers2[1] || numbers2[0]; // берем второе по холодности
+        const selected2 = numbers2[Math.floor(numbers2.length / 2)];
+        
+        // Формируем детали расчета
+        let calcHTML = `
+            <div><strong>Всего тиражей:</strong> ${draws}</div>
+            <div><strong>Средняя частота:</strong> ${avgFrequency.toFixed(2)}</div>
+            <div><strong>Отклонения чисел:</strong></div>
+        `;
+        
+        for(let i = 0; i < 20; i++) {
+            calcHTML += `<div>${i+1}: ${deviations[i].toFixed(2)} ${selected1.includes(i+1) ? '✓' : ''}</div>`;
+        }
+        
+        calcHTML += `<div><strong>Выбранные числа:</strong> ${selected1.join(', ')}</div>`;
+        calcHTML += `<div><strong>Число для поля 2:</strong> ${selected2} (медиана)</div>`;
+        
+        karnaughDetails.innerHTML = calcHTML;
         
         displayNumbers(selected1, selected2, 'karnaugh');
     }
@@ -976,18 +1032,29 @@
         nums1.forEach(n => {
             const div = document.createElement('div');
             div.className = 'number';
-            if(method === 'karnaugh' && nums1.indexOf(n) < 5) {
+            
+            // Специальное оформление для метода Карнауха
+            if(method === 'karnaugh') {
+                div.classList.add('karnaugh');
+            }
+            // Для других методов используем стандартное оформление
+            else if(method === 'ogneva') {
                 div.classList.add('special');
             }
+            
             div.textContent = n;
             field1.appendChild(div);
         });
         
         const div2 = document.createElement('div');
         div2.className = 'number small';
-        if(method === 'ogneva') {
+        
+        if(method === 'karnaugh') {
+            div2.classList.add('karnaugh');
+        } else if(method === 'ogneva') {
             div2.classList.add('special');
         }
+        
         div2.textContent = num2;
         field2.appendChild(div2);
         
