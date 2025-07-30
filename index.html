@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon180.png">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="RDS3">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Рапидо Старт</title>
     <style>
         :root {
@@ -42,6 +40,7 @@
             margin: 0;
             padding: 0;
             transition: background-color 0.3s, color 0.3s;
+            -webkit-tap-highlight-color: transparent;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -131,22 +130,16 @@
             font-weight: 500;
             cursor: pointer;
             margin-top: 8px;
-            -webkit-tap-highlight-color: transparent;
+            outline: none;
         }
-        button:active {
+        button:active, button:focus {
             background: var(--button-active);
         }
         button.secondary {
             background: var(--keyboard-bg);
             color: var(--text-color);
         }
-        #fakeInput {
-            position: absolute;
-            opacity: 0;
-            height: 0;
-            width: 0;
-        }
-        #inputDisplay {
+        #inputTextarea {
             width: 100%;
             min-height: 70px;
             border: 1px solid var(--border-color);
@@ -155,8 +148,8 @@
             margin-bottom: 8px;
             font-size: 15px;
             background: var(--card-bg);
-            word-wrap: break-word;
             color: var(--text-color);
+            resize: none;
         }
         .input-active {
             border-color: var(--primary-color);
@@ -211,6 +204,7 @@
             display: none;
             flex-direction: column;
             gap: 6px;
+            touch-action: manipulation;
         }
         .keyboard-row {
             display: flex;
@@ -229,7 +223,7 @@
             font-size: 18px;
             font-weight: bold;
             cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
+            user-select: none;
             color: var(--text-color);
         }
         .keyboard-key:active {
@@ -282,6 +276,7 @@
             border-radius: 8px;
             font-size: 13px;
             cursor: pointer;
+            user-select: none;
         }
         .method-btn.active {
             background: var(--primary-color);
@@ -382,6 +377,16 @@
         .draw {
             background-color: rgba(0, 122, 255, 0.1);
         }
+        
+        /* Для полноэкранного режима */
+        @media (display-mode: fullscreen) {
+            .container {
+                padding-bottom: 320px;
+            }
+            .custom-keyboard {
+                padding-bottom: env(safe-area-inset-bottom);
+            }
+        }
     </style>
 </head>
 <body>
@@ -396,10 +401,10 @@
         <div class="card">
             <h2>Сгенерировать числа</h2>
             <div class="method-selector">
-                <div class="method-btn active" data-method="cold">Холодные</div>
-                <div class="method-btn" data-method="ogneva">Огнева<span class="info-icon" title="Характеристическое число">?</span></div>
-                <div class="method-btn" data-method="karnaugh">Карнауха<span class="info-icon" title="Метод математика П.В. Карнауха">?</span></div>
-                <div class="method-btn" data-method="random">Случайные</div>
+                <div class="method-btn active" data-method="cold" tabindex="0">Холодные</div>
+                <div class="method-btn" data-method="ogneva" tabindex="0">Огнева<span class="info-icon" title="Характеристическое число">?</span></div>
+                <div class="method-btn" data-method="karnaugh" tabindex="0">Карнауха<span class="info-icon" title="Метод математика П.В. Карнауха">?</span></div>
+                <div class="method-btn" data-method="random" tabindex="0">Случайные</div>
             </div>
             <p>Поле 1 (8 из 20):</p>
             <div class="numbers" id="field1"></div>
@@ -412,8 +417,7 @@
         <div class="card">
             <h2>Добавить тираж</h2>
             <div id="inputContainer" style="position:relative;">
-                <input type="text" id="fakeInput" readonly />
-                <div id="inputDisplay" onclick="showKeyboard()">Коснитесь для ввода (формат: номер_тиража|1,2,3,4,5,6,7,8|1)</div>
+                <textarea id="inputTextarea" placeholder="Формат: номер_тиража|1,2,3,4,5,6,7,8|1"></textarea>
                 <div id="validationError" class="validation-error"></div>
             </div>
             <button id="addHistoryBtn">Добавить</button>
@@ -436,7 +440,6 @@
             <button id="clearHistoryBtn" class="secondary">Очистить историю</button>
         </div>
         
-        <!-- Новый блок для статистики выигрышей -->
         <div class="card">
             <h2>Статистика выигрышей</h2>
             <div id="winsStats" class="win-stats">
@@ -555,24 +558,18 @@
     }
 
     // --- Ввод ---
-    const inputDisplay = document.getElementById('inputDisplay');
-    const fakeInput = document.getElementById('fakeInput');
+    const inputTextarea = document.getElementById('inputTextarea');
     const customKeyboard = document.getElementById('customKeyboard');
     const validationError = document.getElementById('validationError');
 
     function showKeyboard() {
         customKeyboard.style.display = 'flex';
-        inputDisplay.classList.add('input-active');
+        inputTextarea.classList.add('input-active');
         validationError.style.display = 'none';
     }
     function hideKeyboard() {
         customKeyboard.style.display = 'none';
-        inputDisplay.classList.remove('input-active');
-    }
-
-    // Отобразить введённый текст
-    function updateInputDisplay() {
-        inputDisplay.textContent = fakeInput.value || 'Коснитесь для ввода (формат: номер_тиража|1,2,3,4,5,6,7,8|1)';
+        inputTextarea.classList.remove('input-active');
     }
 
     // Клавиши виртуальной клавиатуры
@@ -584,18 +581,46 @@
             return;
         }
         if(key === '⌫') {
-            fakeInput.value = fakeInput.value.slice(0, -1);
-            updateInputDisplay();
+            inputTextarea.value = inputTextarea.value.slice(0, -1);
             return;
         }
         // Разрешаем цифры, запятую и вертикальную черту
         if(/[0-9,|]/.test(key)) {
-            fakeInput.value += key;
-            updateInputDisplay();
+            inputTextarea.value += key;
         }
     });
 
-    inputDisplay.onclick = showKeyboard;
+    // Обработка touch-событий для виртуальной клавиатуры
+    customKeyboard.addEventListener('touchstart', e => {
+        if(e.target.classList.contains('keyboard-key')) {
+            e.target.classList.add('active');
+        }
+    });
+    
+    customKeyboard.addEventListener('touchend', e => {
+        if(e.target.classList.contains('keyboard-key')) {
+            e.target.classList.remove('active');
+            const key = e.target.textContent;
+            if(key === 'Готово') {
+                hideKeyboard();
+                return;
+            }
+            if(key === '⌫') {
+                inputTextarea.value = inputTextarea.value.slice(0, -1);
+                return;
+            }
+            if(/[0-9,|]/.test(key)) {
+                inputTextarea.value += key;
+            }
+        }
+    });
+
+    // Обработчики для textarea
+    inputTextarea.addEventListener('focus', showKeyboard);
+    inputTextarea.addEventListener('blur', () => {
+        // Не скрываем клавиатуру сразу, чтобы дать время нажать на кнопки
+        setTimeout(hideKeyboard, 300);
+    });
 
     // --- Валидация ввода ---
     function validateInput(val) {
@@ -639,7 +664,7 @@
 
     // --- Добавление в историю ---
     document.getElementById('addHistoryBtn').onclick = () => {
-        const val = fakeInput.value.trim();
+        const val = inputTextarea.value.trim();
         if(!val) {
             validationError.textContent = 'Введите числа в формате: номер_тиража|1,2,3,4,5,6,7,8|1';
             validationError.style.display = 'block';
@@ -659,8 +684,7 @@
         saveHistory();
         renderHistory();
         updateStats();
-        fakeInput.value = '';
-        updateInputDisplay();
+        inputTextarea.value = '';
         hideKeyboard();
     };
 
@@ -740,6 +764,19 @@
     // Переключение методов
     document.querySelectorAll('.method-btn').forEach(btn => {
         btn.addEventListener('click', () => {
+            document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentMethod = btn.dataset.method;
+            generateNumbers();
+        });
+        
+        // Добавляем обработчики для touch-устройств
+        btn.addEventListener('touchstart', () => {
+            btn.classList.add('active');
+        });
+        
+        btn.addEventListener('touchend', () => {
+            setTimeout(() => btn.classList.remove('active'), 300);
             document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentMethod = btn.dataset.method;
@@ -1043,6 +1080,16 @@
     updateStats();
     updateWinsStats();
     generateNumbers();
+    
+    // Обработчики для всех кнопок (для PWA режима)
+    document.querySelectorAll('button').forEach(button => {
+        button.addEventListener('touchstart', () => {
+            button.classList.add('active');
+        });
+        button.addEventListener('touchend', () => {
+            setTimeout(() => button.classList.remove('active'), 300);
+        });
+    });
 </script>
 </body>
 </html>
