@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <link rel="apple-touch-icon" sizes="180x180" href="icons/icon180.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="RDS3">
@@ -406,6 +406,7 @@
             width: 0;
             top: -1000px;
             left: -1000px;
+            pointer-events: none;
         }
         
         .calc-details {
@@ -423,6 +424,14 @@
             font-weight: bold;
             margin-bottom: 5px;
             color: var(--primary-color);
+        }
+        
+        /* PWA режим */
+        .pwa-mode .container {
+            padding-bottom: calc(280px + env(safe-area-inset-bottom));
+        }
+        .pwa-mode .custom-keyboard {
+            padding-bottom: max(8px, env(safe-area-inset-bottom));
         }
     </style>
 </head>
@@ -548,8 +557,14 @@
     // Инициализация темы по сохранённому значению
     applyTheme(localStorage.getItem('darkMode') === 'true');
 
+    // Проверка на PWA режим
+    if (window.matchMedia('(display-mode: fullscreen)').matches) {
+        document.documentElement.classList.add('pwa-mode');
+    }
+
     // --- История ---
-    let history = JSON.parse(localStorage.getItem('rapido2History') || []);
+    let history = JSON.parse(localStorage.getItem('rapido2History') || '[]');
+    if (!Array.isArray(history)) history = [];
     
     // --- Отображение истории ---
     const historyList = document.getElementById('historyList');
@@ -573,7 +588,7 @@
     renderHistory();
     
     // Удаление записи
-    historyList.addEventListener('click', e => {
+    historyList.addEventListener('pointerup', e => {
         if(e.target.tagName === 'BUTTON') {
             const idx = +e.target.dataset.idx;
             history.splice(idx, 1);
@@ -633,7 +648,11 @@
 
     // Обработка нажатий на виртуальную клавиатуру
     document.querySelectorAll('.keyboard-key').forEach(key => {
-        key.addEventListener('click', function() {
+        key.addEventListener('pointerdown', function(e) {
+            if (e.pointerType === 'touch') {
+                e.preventDefault();
+            }
+            
             const keyText = this.textContent;
             
             if (keyText === 'Готово') {
@@ -656,27 +675,15 @@
     });
 
     // Обработчики событий для поля ввода (PWA-совместимые)
+    inputDisplay.addEventListener('pointerdown', function(e) {
+        if (e.pointerType === 'touch') {
+            e.preventDefault();
+            showKeyboard();
+        }
+    });
+    
     inputDisplay.addEventListener('click', showKeyboard);
     
-    inputDisplay.addEventListener('touchstart', function(e) {
-        e.preventDefault();
-        showKeyboard();
-    });
-    
-    inputDisplay.addEventListener('touchend', function(e) {
-        e.preventDefault();
-    });
-    
-    inputDisplay.addEventListener('mousedown', function(e) {
-        e.preventDefault();
-        showKeyboard();
-    });
-    
-    // Обработка фокуса для PWA
-    fakeInput.addEventListener('focus', function() {
-        // В PWA режиме фокус может быть получен, но нам не нужно ничего делать
-    });
-
     // --- Валидация ввода ---
     function validateInput(val) {
         validationError.style.display = 'none';
@@ -820,7 +827,7 @@
     
     // Переключение методов
     document.querySelectorAll('.method-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('pointerdown', () => {
             document.querySelectorAll('.method-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentMethod = btn.dataset.method;
@@ -1166,11 +1173,11 @@
     
     // Обработчики для всех кнопок (для PWA режима)
     document.querySelectorAll('button').forEach(button => {
-        button.addEventListener('touchstart', () => {
+        button.addEventListener('pointerdown', () => {
             button.classList.add('active');
         });
-        button.addEventListener('touchend', () => {
-            setTimeout(() => button.classList.remove('active'), 300);
+        button.addEventListener('pointerup', () => {
+            button.classList.remove('active');
         });
     });
     
